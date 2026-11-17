@@ -13,8 +13,9 @@ on:
 
 # Only one watcher at a time. New scheduled runs queue behind the running one,
 # so a fresh watcher starts as soon as the previous ~5.5h run ends.
+# test-notify / once runs get their own group so they never wait behind it.
 concurrency:
-  group: bms-watch
+  group: bms-${{ inputs.mode || 'watch' }}
   cancel-in-progress: false
 
 permissions:
