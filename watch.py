@@ -31,12 +31,13 @@ from playwright.sync_api import sync_playwright, TimeoutError as PWTimeout
 # --------------------------------------------------------------------------
 # Open BookMyShow -> Bengaluru -> Cinemas -> AMB Cinemas, pick any date and
 # copy the URL. It looks like:
-#   https://in.bookmyshow.com/cinemas/bengaluru/amb-cinemas-.../buytickets/XXXX/20261210
+#   https://in.bookmyshow.com/cinemas/BANG/amb-cinemas-kapali-bengaluru/buytickets/ACKB/20261117
 # The date at the end gets replaced with TARGET_DATE automatically.
-VENUE_URL = os.getenv("BMS_VENUE_URL", "")
-TARGET_DATE = os.getenv("BMS_DATE", "20261217")        # YYYYMMDD
-MOVIE_KEYWORD = os.getenv("BMS_MOVIE", "doomsday")     # matched case-insensitively
-INTERVAL_SEC = int(os.getenv("BMS_INTERVAL", "180"))   # time between checks
+VENUE_URL = (os.getenv("BMS_VENUE_URL") or
+             "https://in.bookmyshow.com/cinemas/BANG/amb-cinemas-kapali-bengaluru/buytickets/ACKB/20261117")
+TARGET_DATE = (os.getenv("BMS_DATE") or "20261217")        # YYYYMMDD
+MOVIE_KEYWORD = (os.getenv("BMS_MOVIE") or "doomsday")     # matched case-insensitively
+INTERVAL_SEC = int(os.getenv("BMS_INTERVAL") or 180)   # time between checks
 
 # Phone push via https://ntfy.sh (free, no account). Install the ntfy app and
 # subscribe to this topic. Pick something long and random; anyone who knows

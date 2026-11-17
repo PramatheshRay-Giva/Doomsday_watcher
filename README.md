@@ -18,7 +18,6 @@ You can also run it locally on any computer that stays awake (steps 1–4).
 Once tickets are live, it alerts you and switches itself off.
 
 1. Go to **Settings → Secrets and variables → Actions → New repository secret** and add:
-   - `BMS_VENUE_URL`: the AMB link (see step 2 below)
    - `NTFY_TOPIC`: your ntfy topic, and/or
    - `SMTP_USER` + `SMTP_PASS`: Gmail address and App Password (optionally `EMAIL_TO` if alerts should go elsewhere)
 2. Go to **Actions → BMS watcher → Run workflow** and choose `test-notify`. You should get a test alert.
@@ -36,11 +35,10 @@ pip install playwright
 python -m playwright install chromium
 ```
 
-## 2. Get the AMB venue link
+## 2. AMB venue link
 
-On in.bookmyshow.com: set the city to **Bengaluru**, open **Cinemas**, choose **AMB Cinemas (Kapali, Gandhinagar)** and click any date.
-Copy the URL from the address bar. It ends in something like `/buytickets/XXXX/20261120`.
-You don't need to change the date in it; the script swaps in 17 Dec itself.
+Already built in: `https://in.bookmyshow.com/cinemas/BANG/amb-cinemas-kapali-bengaluru/buytickets/ACKB/<date>`.
+The script swaps in 17 Dec itself. To watch a different cinema, pass `--url` or set `BMS_VENUE_URL`.
 
 ## 3. Set up notifications (one or both)
 
@@ -52,7 +50,6 @@ You don't need to change the date in it; the script swaps in 17 Dec itself.
 export NTFY_TOPIC="doomsday-amb-x7k29q"
 export SMTP_USER="you@gmail.com"
 export SMTP_PASS="abcdefghijklmnop"
-export BMS_VENUE_URL="https://in.bookmyshow.com/cinemas/bengaluru/amb-.../buytickets/XXXX/20261120"
 ```
 
 (Windows PowerShell: `$env:NTFY_TOPIC="..."` etc.)
