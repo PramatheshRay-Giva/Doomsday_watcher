@@ -1,48 +1,46 @@
-"""One-off: dump BookMyShow page structure into the Actions log so the
-multi-cinema watcher can be written against the real page."""
-import json, re
+"""One-off: dump BookMyShow page structure into the Actions log."""
+import re
 from playwright.sync_api import sync_playwright
 
+UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
 VENUE = "https://in.bookmyshow.com/cinemas/BANG/amb-cinemas-kapali-bengaluru/buytickets/ACKB/20261217"
+
+def lines(page, n):
+    return [l.strip() for l in page.inner_text("body").splitlines() if l.strip()][:n]
 
 with sync_playwright() as p:
     b = p.chromium.launch()
-    ctx = b.new_context(user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
-                        locale="en-IN", timezone_id="Asia/Kolkata", viewport={"width": 1366, "height": 900})
+    ctx = b.new_context(user_agent=UA, locale="en-IN", timezone_id="Asia/Kolkata", viewport={"width": 1366, "height": 900})
     page = ctx.new_page()
-    xhr = []
-    page.on("response", lambda r: xhr.append((r.status, r.url, r.headers.get("content-type", ""))) if "json" in r.headers.get("content-type", "") else None)
+    resp = []
+    def on_resp(r):
+        ct = r.headers.get("content-type", "")
+        if "json" in ct:
+            try: body = r.text()
+            except Exception: body = ""
+            resp.append((r.status, r.url, body))
+    page.on("response", on_resp)
 
-    page.goto(VENUE, wait_until="domcontentloaded", timeout=60000)
-    page.wait_for_timeout(8000)
-    links = page.eval_on_selector_all("a", "els => els.map(e => [e.innerText.trim().slice(0,60), e.href])")
-    print("=== VENUE PAGE doomsday links")
-    for t, h in links:
-        if "doomsday" in (t + h).lower(): print("LINK", repr(t), h)
-    html = page.content()
-    print("ET codes in venue html:", sorted(set(re.findall(r"ET\d{8}", html)))[:20])
-    m = re.search(r'(https://in\.bookmyshow\.com)?/movies/[^"\s]*doomsday[^"\s]*', html)
-    print("movie path in html:", m.group(0) if m else None)
+    page.goto(VENUE, wait_until="domcontentloaded", timeout=60000); page.wait_for_timeout(9000)
+    print("=== VENUE text")
+    for l in lines(page, 90): print("T|", l[:110])
+    print("=== VENUE json responses")
+    for s, u, body in resp:
+        ets = sorted(set(re.findall(r"ET\d{8}", body)))
+        print("X|", s, len(body), u[:180], "ETs:", ets[:8], "doomsday" if "doomsday" in body.lower() else "")
+    for s, u, body in resp:
+        i = body.lower().find("doomsday")
+        if i >= 0:
+            print("SNIP|", u[:120]); print("SNIP|", body[max(0, i-600): i+600].replace("\n", " "))
+            break
+    print("=== VENUE elements mentioning doomsday")
+    els = page.eval_on_selector_all("*", """els => els.filter(e => e.children.length < 3 && /doomsday/i.test(e.innerText||''))
+        .slice(0,8).map(e => [e.tagName, e.className.toString().slice(0,80), (e.getAttribute('href')||''), e.outerHTML.slice(0,300)])""")
+    for e in els: print("E|", e)
 
-    codes = [c for c in sorted(set(re.findall(r"ET\d{8}", html)))]
-    for code in codes[:6]:
-        url = f"https://in.bookmyshow.com/movies/bengaluru/avengers-doomsday/buytickets/{code}/20261217"
-        xhr.clear()
-        page.goto(url, wait_until="domcontentloaded", timeout=60000)
-        page.wait_for_timeout(8000)
-        for _ in range(6):
-            page.mouse.wheel(0, 3000); page.wait_for_timeout(800)
-        txt = page.inner_text("body")
-        print(f"\n=== MOVIE PAGE {code} -> {page.url}  title={page.title()!r}  len={len(txt)}")
-        if "doomsday" not in txt.lower():
-            print("(no doomsday on page)"); continue
-        print("--- first 120 text lines")
-        for line in [l.strip() for l in txt.splitlines() if l.strip()][:120]: print("T|", line[:100])
-        print("--- anchors with cinemas/venue in href")
-        hs = page.eval_on_selector_all("a", "els => els.map(e => [e.innerText.trim().slice(0,60), e.href])")
-        for t, h in hs:
-            if re.search(r"cinemas|venue|seat", h, re.I): print("A|", repr(t), h)
-        print("--- json responses")
-        for s, u, ct in xhr: print("X|", s, u[:200])
-        break
+    resp.clear()
+    page.goto("https://in.bookmyshow.com/explore/movies-bengaluru", wait_until="domcontentloaded", timeout=60000); page.wait_for_timeout(8000)
+    print("=== EXPLORE", page.url)
+    for t, h in page.eval_on_selector_all("a", "els => els.map(e => [e.innerText.trim().slice(0,50), e.href])"):
+        if "doomsday" in (t + h).lower(): print("L|", repr(t), h)
     b.close()
