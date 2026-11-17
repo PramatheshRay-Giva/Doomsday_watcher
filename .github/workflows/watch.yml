@@ -1,0 +1,66 @@
+name: BMS watcher
+
+on:
+  schedule:
+    - cron: "0 * * * *"      # hourly; a run waits in the queue while the previous one is still watching
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "What to do"
+        type: choice
+        options: [watch, test-notify, once]
+        default: watch
+
+# Only one watcher at a time. New scheduled runs queue behind the running one,
+# so a fresh watcher starts as soon as the previous ~5.5h run ends.
+concurrency:
+  group: bms-watch
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  actions: write   # lets the workflow switch itself off once tickets are live
+
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install browser
+        run: |
+          pip install playwright
+          python -m playwright install --with-deps chromium
+
+      - name: Run watcher
+        id: watch
+        env:
+          BMS_VENUE_URL: ${{ secrets.BMS_VENUE_URL }}
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASS: ${{ secrets.SMTP_PASS }}
+          EMAIL_TO: ${{ secrets.EMAIL_TO }}
+        run: |
+          case "${{ inputs.mode || 'watch' }}" in
+            test-notify) python watch.py --test-notify ;;
+            once)        python watch.py --once ;;
+            *)           python watch.py --max-minutes 330 ;;
+          esac
+
+      - name: Save screenshot of last check
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: last-check
+          path: last_check.png
+          if-no-files-found: ignore
+          retention-days: 2
+
+      - name: Tickets are live, so stop scheduling more runs
+        if: steps.watch.outputs.live == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow disable watch.yml --repo "${{ github.repository }}"
